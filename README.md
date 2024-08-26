@@ -14,6 +14,7 @@ Ensure you have the following installed:
 Node.js (20 or higher)
 npm (comes with Node.js)
 # steps
-git clone https://github.com/YourUsername/Loan-Management-System-Admin-Panel.git
-cd Loan-Management-System-Admin-Panel
-npm install
+#git clone https://github.com/YourUsername/Loan-Management-System-Admin-Panel.git
+#cd Loan-Management-System-Admin-Panel
+#npm install
+#npm run dev
