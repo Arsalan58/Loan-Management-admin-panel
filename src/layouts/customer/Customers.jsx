@@ -10,7 +10,7 @@ import DashboardNavbar from "examples/Navbars/DashboardNavbar";
 import MDBox from "components/MDBox";
 import MDTypography from "components/MDTypography";
 import MDSnackbar from "components/MDSnackbar";
-import { Button } from "@mui/material";
+import { Button, IconButton } from "@mui/material";
 import AddIcon from '@mui/icons-material/Add';
 import SearchIcon from '@mui/icons-material/Search';
 import moment from "moment";
@@ -19,23 +19,34 @@ import LoanModal from "../../components/LoanModal";
 import { usePagination } from "hooks/usePagination";
 import { BASE_URL } from "constants";
 import Footer from "examples/Footer";
+import { Edit } from "@mui/icons-material";
 
 function Customers() {
-    const [content, setContent] = useState([]);
     const [filteredRows, setFilteredRows] = useState([]);
     const [loading, setLoading] = useState(true);
     const { page, limit, total, changePage, changeLimit, changeTotal } = usePagination();
     const [successSB, setSuccessSB] = useState(false);
     const [openModal, setOpenModal] = useState(false);
     const [searchQuery, setSearchQuery] = useState("");
-
     const [loanModalOpen, setLoanModalOpen] = useState(false);
     const [selectedCustomerId, setSelectedCustomerId] = useState(null);
+    const [editable, setEditable] = useState(false);
+    const [initialState, setInitialState] = useState({});
+    const openSuccessSB = (status, title) => setSuccessSB({ status, title });
+    const closeSuccessSB = () => setSuccessSB({});
 
-    const openSuccessSB = (title) => setSuccessSB(title);
-    const closeSuccessSB = () => setSuccessSB(false);
+    const handleOpenModal = () => {
+        setInitialState({}); // Reset initial state when creating a new customer
+        setEditable(false);  // Ensure it's set to non-editable
+        setOpenModal(true);
+    };
 
-    const handleOpenModal = () => setOpenModal(true);
+    const handleEditCustomer = (rowData) => {
+        setInitialState(rowData);  // Pre-fill the form with the selected customer data
+        setEditable(true);         // Enable editing mode
+        setOpenModal(true);        // Open the modal
+    };
+
     const handleCloseModal = () => setOpenModal(false);
 
     const handleOpenLoanModal = (customerId) => {
@@ -73,12 +84,12 @@ function Customers() {
 
     const renderSuccessSB = (
         <MDSnackbar
-            color={successSB ? "success" : "warning"}
-            icon={successSB ? "check" : "warning"}
-            title={successSB ? successSB : ""}
-            content={content ? content : ""}
+            color={successSB.status === "success" ? "success" : successSB.status === "error" ? "warning" : "dark"}
+            icon={successSB.status === "success" ? "check" : successSB.status === "error" ? "warning" : ""}
+            title={successSB.status ? successSB.status : ""}
+            content={successSB.title ? successSB.title : ""}
             dateTime="1 min ago"
-            open={Boolean(successSB)}
+            open={Boolean(successSB.status)}
             onClose={closeSuccessSB}
             close={closeSuccessSB}
             bgWhite
@@ -86,13 +97,12 @@ function Customers() {
     );
 
     const columns = [
-        { field: 'id', headerName: 'ID', width: 90 },
+        { field: 'custId', headerName: 'Cx Id', width: 110,  },
         { field: 'name', headerName: 'Name', width: 150 },
         { field: 'mobile', headerName: 'Mobile', width: 150 },
         { field: 'PAN', headerName: 'PAN', width: 150 },
         { field: 'Aadhaar', headerName: 'Aadhaar', width: 150 },
         { field: 'address', headerName: 'Address', width: 200 },
-        // { field: 'loanPurpose', headerName: 'Loan Purpose', width: 200 },
         {
             field: 'action',
             headerName: 'Action',
@@ -101,10 +111,23 @@ function Customers() {
                 <Button
                     variant="contained"
                     color="primary"
+                    size="small"
                     onClick={() => handleOpenLoanModal(params.row.id)}
                 >
                     Create Loan
                 </Button>
+            ),
+        },
+        {
+            field: 'edit',
+            headerName: 'Edit',
+            disableColumnMenu: true,
+            sortable: false,
+            width: 70,
+            renderCell: (params) => (
+                <IconButton aria-label="edit" onClick={() => handleEditCustomer(params.row)}>
+                    <Edit />
+                </IconButton>
             ),
         },
     ];
@@ -113,20 +136,19 @@ function Customers() {
         setLoading(true);
         try {
             const response = await axios.get(`${BASE_URL}/api/web/retrieve/customers`, {
-                params: { page, limit, mobile: query },
+                params: { page, limit, search: query },
+                headers: { "Authorization": localStorage.getItem("token") }
             });
             if (response.data.type === "success") {
-                openSuccessSB(response.data.message);
+                openSuccessSB(response.data.type, response.data.message);
                 setFilteredRows(response.data.data.data);
                 changeTotal(response.data.data.total);
             } else {
-                setContent("Failed to retrieve customers.");
-                openSuccessSB("Error");
+                openSuccessSB(response.data.type, response.data.message);
             }
         } catch (err) {
             console.error(err);
-            setContent("An error occurred while fetching customers.");
-            openSuccessSB("Error");
+            openSuccessSB("error", err.message);
         }
         setLoading(false);
     };
@@ -169,11 +191,7 @@ function Customers() {
                                         variant="outlined"
                                         size="small"
                                         placeholder="Search by PAN or Mobile"
-                                        sx={{
-                                            marginRight: 1,
-                                            backgroundColor: "white !important",
-                                            borderRadius: "4px !important"
-                                        }}
+                                        sx={{ marginRight: 1, backgroundColor: "white !important", borderRadius: "4px !important" }}
                                         value={searchQuery}
                                         onChange={handleSearchInputChange}
                                     />
@@ -196,7 +214,6 @@ function Customers() {
                             <MDBox pt={3} px={3} pb={1}>
                                 <ThemeProvider theme={theme}>
                                     <div style={{ height: 400, width: '100%' }}>
-
                                         <DataGrid
                                             rows={filteredRows}
                                             columns={columns}
@@ -208,7 +225,6 @@ function Customers() {
                                             paginationMode='server'
                                             rowCount={total}
                                             pageSize={limit}
-                                            // checkboxSelection
                                             onPaginationModelChange={(value) => {
                                                 if (value.pageSize !== limit) {
                                                     changeLimit(value.pageSize);
@@ -219,31 +235,31 @@ function Customers() {
                                             }}
                                             disableSelectionOnClick
                                             loading={loading}
+                                            disableRowSelectionOnClick
                                         />
                                     </div>
                                 </ThemeProvider>
                             </MDBox>
                         </Card>
                     </Grid>
-                    <Grid item xs={12} sm={6} lg={3}>
-                        {renderSuccessSB}
-                    </Grid>
                 </Grid>
             </MDBox>
+            {renderSuccessSB}
             <CustomerModal
                 open={openModal}
                 handleClose={handleCloseModal}
                 openSuccessSB={openSuccessSB}
+                isEditMode={editable}
+                initialData={initialState}
                 setFilteredRows={setFilteredRows}
                 changeTotal={changeTotal}
             />
             <LoanModal
                 open={loanModalOpen}
+                openSuccessSB={openSuccessSB}
                 handleClose={handleCloseLoanModal}
                 customerId={selectedCustomerId}
-            />
-            <Footer />
-
+            />            <Footer />
         </DashboardLayout>
     );
 }

@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useLocation, NavLink, useNavigate } from "react-router-dom";
 import PropTypes from "prop-types";
 import List from "@mui/material/List";
@@ -10,12 +10,14 @@ import MDButton from "components/MDButton";
 import SidenavCollapse from "examples/Sidenav/SidenavCollapse";
 import SidenavRoot from "examples/Sidenav/SidenavRoot";
 import sidenavLogoLabel from "examples/Sidenav/styles/sidenav";
+import MDSnackbar from "components/MDSnackbar";
 import {
   useMaterialUIController,
   setMiniSidenav,
   setTransparentSidenav,
   setWhiteSidenav,
 } from "context";
+import { BASE_URL } from "constants";
 
 function Sidenav({ color, brand, brandName, routes, ...rest }) {
   const [controller, dispatch] = useMaterialUIController();
@@ -23,6 +25,10 @@ function Sidenav({ color, brand, brandName, routes, ...rest }) {
   const location = useLocation();
   const navigate = useNavigate(); // useNavigate hook for navigation
   const collapseName = location.pathname.replace("/", "");
+  
+  // Loader and Snackbar state
+  const [loading, setLoading] = useState(false);
+  const [snackbar, setSnackbar] = useState({ status: "", message: "", open: false });
 
   let textColor = "white";
 
@@ -104,8 +110,10 @@ function Sidenav({ color, brand, brandName, routes, ...rest }) {
   });
 
   const handleLogout = async () => {
+    setLoading(true); 
+
     try {
-      const response = await fetch('http://localhost:3000/api/web/auth/logout', {
+      const response = await fetch(`${BASE_URL}/api/web/auth/logout`, {
         method: 'DELETE',
         headers: {
           'Authorization': `${localStorage.getItem('token')}`,
@@ -116,21 +124,43 @@ function Sidenav({ color, brand, brandName, routes, ...rest }) {
       const result = await response.json();
 
       if (result.type === "success") {
-        // Remove the token from localStorage or cookies
         localStorage.removeItem('token');
         
-        // Redirect the user to the login page
+        setSnackbar({ status: "success", message: "Logout successful", open: true });
+
         navigate('/sign-in');
       } else {
-        // Handle error - show a notification, alert, etc.
-        alert("Logout failed: " + result.message);
+        // setSnackbar({ status: "error", message: result.message, open: true });
+        alert(result.message)
+        // console.log(result.message)
       }
     } catch (error) {
-      // Handle fetch error
       console.error('Error logging out:', error);
-      alert("An error occurred during logout. Please try again.");
+      alert(error.message)
+
+      // setSnackbar({ status: "error", message: "An error occurred during logout", open: true });
+    } finally {
+      setLoading(false); 
     }
   };
+
+  const closeSnackbar = () => {
+    setSnackbar((prev) => ({ ...prev, open: false }));
+  };
+
+  const renderSnackbar = (
+    <MDSnackbar
+      color={snackbar.status === "success" ? "success" : snackbar.status === "error" ? "warning" : "dark"}
+      icon={snackbar.status === "success" ? "check" : snackbar.status === "error" ? "warning" : ""}
+      title={snackbar.status ? snackbar.status : ""}
+      content={snackbar.message ? snackbar.message : ""}
+      dateTime="1 min ago"
+      open={snackbar.open}
+      onClose={closeSnackbar}
+      close={closeSnackbar}
+      bgWhite
+    />
+  );
 
   return (
     <SidenavRoot
@@ -173,14 +203,16 @@ function Sidenav({ color, brand, brandName, routes, ...rest }) {
       <List>{renderRoutes}</List>
       <MDBox p={2} mt="auto">
         <MDButton
-          onClick={handleLogout} // Attach the handleLogout function to the button
+          onClick={handleLogout}
           variant="gradient"
           color={sidenavColor}
           fullWidth
+          disabled={loading} 
         >
-          Logout
+          {loading ? "Logging out..." : "Logout"}
         </MDButton>
       </MDBox>
+      {renderSnackbar}
     </SidenavRoot>
   );
 }

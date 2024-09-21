@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { MenuItem, Select } from "@mui/material";
+import { MenuItem, Select, TextField } from "@mui/material";
 import axios from "axios";
 import Grid from "@mui/material/Grid";
 import Card from "@mui/material/Card";
@@ -11,7 +11,6 @@ import Footer from "examples/Footer";
 import MDBox from "components/MDBox";
 import MDTypography from "components/MDTypography";
 import MDSnackbar from "components/MDSnackbar";
-import MDButton from "components/MDButton";
 import { Button } from "@mui/material";
 import AddIcon from "@mui/icons-material/Add";
 import { BASE_URL } from "constants";
@@ -23,13 +22,16 @@ function FieldOfficer() {
     const [filteredRows, setFilteredRows] = useState([]);
     const [loading, setLoading] = useState(true);
     const { page, limit, total, changePage, changeLimit, changeTotal } = usePagination();
-    const [successSB, setSuccessSB] = useState(false);
+    const [successSB, setSuccessSB] = useState({ status: null, message: "" });
     const [openModal, setOpenModal] = useState(false);
-    const [content, setContent] = useState("");
 
-    const openSuccessSB = (title) => setSuccessSB(title);
-    const closeSuccessSB = () => setSuccessSB(false);
+    // Function to open snackbar
+    const openSuccessSB = (status, message) => setSuccessSB({ status, message });
 
+    // Function to close snackbar
+    const closeSuccessSB = () => setSuccessSB({ status: null, message: "" });
+
+    // Open and close modal handlers
     const handleOpenModal = () => setOpenModal(true);
     const handleCloseModal = () => setOpenModal(false);
 
@@ -39,7 +41,7 @@ function FieldOfficer() {
             secondary: { main: "#d32f2f" },
             success: { main: "#2e7d32" },
         },
-        typography: { fontFamily: "Roboto,Helvetica, Arial, sans-serif" },
+        typography: { fontFamily: "Roboto, Helvetica, Arial, sans-serif" },
         components: {
             MuiDataGrid: {
                 styleOverrides: {
@@ -57,12 +59,12 @@ function FieldOfficer() {
 
     const renderSuccessSB = (
         <MDSnackbar
-            color={successSB ? "success" : "warning"}
-            icon={successSB ? "check" : "warning"}
-            title={successSB ? successSB : ""}
-            content={content ? content : ""}
+            color={successSB.status === "success" ? "success" : successSB.status === "error" ? "warning" : "dark"}
+            icon={successSB.status === "success" ? "check" : successSB.status === "error" ? "warning" : ""}
+            title={successSB.status ? successSB.status : ""}
+            content={successSB.message ? successSB.message : ""}
             dateTime="1 min ago"
-            open={Boolean(successSB)}
+            open={Boolean(successSB.status)}
             onClose={closeSuccessSB}
             close={closeSuccessSB}
             bgWhite
@@ -72,19 +74,22 @@ function FieldOfficer() {
     const handleStatusChange = async (id, newStatus) => {
         try {
             const response = await axios.put(`${BASE_URL}/api/web/status/field-officer`, { status: newStatus }, {
-                params: { id }
+                params: { id },
+                headers: {
+                    "Authorization": localStorage.getItem("token")
+                }
             });
             if (response.data.type === "success") {
-                openSuccessSB("Status updated successfully");
+                openSuccessSB("success", "Status updated successfully");
                 setFilteredRows((prevRows) =>
                     prevRows.map((row) => (row.id === id ? { ...row, status: newStatus } : row))
                 );
             } else {
-                openSuccessSB("Error", "Failed to update status");
+                openSuccessSB("error", response.data.message);
             }
         } catch (err) {
             console.error(err);
-            openSuccessSB("Error", "An error occurred while updating the status");
+            openSuccessSB("error", err.response.data);
         }
     };
 
@@ -116,37 +121,77 @@ function FieldOfficer() {
                     onChange={(event) => handleStatusChange(params.row.id, event.target.value)}
                     variant="outlined"
                     sx={{
-                        width: "100%",
+                        width: "90%",
                         backgroundColor: getStatusColor(params.value),
                         color: "white",
+                        fontSize: "13px",
                         fontWeight: "bold",
                         "& .MuiSelect-select": {
-                            padding: "8px",
+                            padding: "5px",
                         },
                         "&:hover": {
                             backgroundColor: getStatusColor(params.value),
                         },
                     }}
                 >
-                    <MenuItem value="Active" sx={{
-                        "&:hover": {
-                            backgroundColor: getStatusColor(params.value),
-                        }, backgroundColor: "#4caf50", color: "white", fontWeight: "bold"
-                    }}>
+                    <MenuItem
+                        value="Active"
+                        sx={{
+                            "&:hover": {
+                                backgroundColor: "green",
+                            },
+                            backgroundColor: "#4caf50",
+                            color: "white",
+                            fontWeight: "bold",
+                            "&.Mui-selected": {
+                                background: `${getStatusColor(params.value)} !important`,
+                                color: "white !important",
+                            },
+                            "&.Mui-selected:hover": {
+                                background: "green",
+                            },
+                        }}
+                    >
                         Active
                     </MenuItem>
-                    <MenuItem value="Inactive" sx={{
-                        "&:hover": {
-                            backgroundColor: getStatusColor(params.value),
-                        }, backgroundColor: "#ff9800", color: "white", fontWeight: "bold"
-                    }}>
+                    <MenuItem
+                        value="Inactive"
+                        sx={{
+                            "&:hover": {
+                                backgroundColor: "orange",
+                            },
+                            backgroundColor: "#ff9800",
+                            color: "white",
+                            fontWeight: "bold",
+                            "&.Mui-selected": {
+                                background: getStatusColor(params.value),
+                                color: "white !important",
+                            },
+                            "&.Mui-selected:hover": {
+                                background: "orange",
+                            },
+                        }}
+                    >
                         Inactive
                     </MenuItem>
-                    <MenuItem value="Suspended" sx={{
-                        "&:hover": {
-                            backgroundColor: getStatusColor(params.value),
-                        }, backgroundColor: "#f44336", color: "white", fontWeight: "bold"
-                    }}>
+                    <MenuItem
+                        value="Suspended"
+                        sx={{
+                            "&:hover": {
+                                backgroundColor: "red",
+                            },
+                            backgroundColor: "#f44336",
+                            color: "white",
+                            fontWeight: "bold",
+                            "&.Mui-selected": {
+                                background: getStatusColor(params.value),
+                                color: "white !important",
+                            },
+                            "&.Mui-selected:hover": {
+                                background: "red",
+                            },
+                        }}
+                    >
                         Suspended
                     </MenuItem>
                 </Select>
@@ -166,30 +211,35 @@ function FieldOfficer() {
         },
     ];
 
-    useEffect(() => {
-        const fetchFieldOfficers = async () => {
-            setLoading(true);
-            try {
-                const response = await axios.get(`${BASE_URL}/api/web/retrieve/field-officers`, {
-                    params: { page, limit },
-                });
-                if (response.data.type === "success") {
-                    openSuccessSB(response.data.message);
-                    setFilteredRows(response.data.data.data);
-                    changeTotal(response.data.data.total);
-                } else {
-                    setContent("Failed to retrieve field officers.");
-                    openSuccessSB("Error");
+    const fetchFieldOfficers = async (query = "") => {
+        setLoading(true);
+        try {
+            const response = await axios.get(`${BASE_URL}/api/web/retrieve/field-officers`, {
+                params: { page, limit, search, },
+                headers: {
+                    "Authorization": localStorage.getItem("token")
                 }
-            } catch (err) {
-                console.error(err);
-                setContent("An error occurred while fetching field officers.");
-                openSuccessSB("Error");
+            });
+            if (response.data.type === "success") {
+                setFilteredRows(response.data.data.data);
+                changeTotal(response.data.data.total);
+                openSuccessSB("success", "retrieved field officers successfully.");
+
+            } else {
+                openSuccessSB("error", "Failed to retrieve field officers.");
             }
-            setLoading(false);
-        };
-        fetchFieldOfficers();
-    }, [page, limit]);
+        } catch (err) {
+            console.error(err);
+            openSuccessSB("error", "An error occurred while fetching field officers.");
+            // setContent("")
+        }
+        setLoading(false);
+    };
+    const [search, setSearch] = useState("")
+    const [refetchFieldOfficers, setRefetchFieldOfficers] = useState(new Date())
+    useEffect(() => {
+        fetchFieldOfficers(search);
+    }, [page, limit, refetchFieldOfficers]);
 
     return (
         <DashboardLayout>
@@ -221,8 +271,39 @@ function FieldOfficer() {
                                 </Button>
                             </MDBox>
                             <MDBox pt={3} px={3} pb={1}>
+                                <Grid container spacing={2} mb={2} alignItems="center">
+                                    <Grid item xs={4} sm={4}>
+                                        <TextField
+                                            label={"Search by Mobile Number"}
+                                            // label={"Search by Mobile Number Or PAN Or Aadhar"}
+                                            variant="outlined"
+                                            size="small"
+                                            fullWidth
+                                            value={search}
+                                            onChange={(e) => {
+                                                if (e.target.value === "") {
+                                                    setRefetchFieldOfficers(new Date())
+                                                }
+                                                // handleSearchChange(e)
+                                                setSearch(e.target.value)
+                                            }}
+                                        />
+                                    </Grid>
+                                    <Grid item xs={1} sm={1}>
+                                        <Button
+                                            variant="contained"
+                                            onClick={() => {
+                                                setRefetchFieldOfficers(new Date())
+                                            }}
+                                            sx={{ bgcolor: "#2881ea", color: "white !important" }}
+                                            fullWidth
+                                        >
+                                            Search
+                                        </Button>
+                                    </Grid>
+                                </Grid>
                                 <ThemeProvider theme={theme}>
-                                    <div style={{ height: 400, width: '100%' }}>
+                                    <div style={{ height: 400, width: "100%" }}>
                                         <DataGrid
                                             rows={filteredRows}
                                             columns={columns}
@@ -234,7 +315,7 @@ function FieldOfficer() {
                                             paginationMode="server"
                                             rowCount={total}
                                             pageSize={limit}
-                                            checkboxSelection
+                                            disableRowSelectionOnClick
                                             onPaginationModelChange={(value) => {
                                                 if (value.pageSize !== limit) {
                                                     changeLimit(value.pageSize);
@@ -263,7 +344,7 @@ function FieldOfficer() {
                 setFilteredRows={setFilteredRows}
                 changeTotal={changeTotal}
             />
-            <Footer/>
+            <Footer />
         </DashboardLayout>
     );
 }

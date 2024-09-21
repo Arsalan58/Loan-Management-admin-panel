@@ -10,7 +10,11 @@ function CustomerDetailsModal({ open, handleClose, customerId }) {
         if (customerId) {
             const fetchCustomerDetails = async () => {
                 try {
-                    const response = await axios.get(`${BASE_URL}/api/customers/${customerId}`);
+                    const response = await axios.get(`${BASE_URL}/api/customers/${customerId}`,{
+                        headers: {
+                            "Authorization": localStorage.getItem("token")
+                        }
+                    });
                     setCustomer(response.data);
                 } catch (error) {
                     console.error('Failed to fetch customer details:', error);

@@ -10,7 +10,7 @@ import Footer from "examples/Footer";
 import MDBox from "components/MDBox";
 import MDTypography from "components/MDTypography";
 import MDSnackbar from "components/MDSnackbar";
-import { Button, Chip, IconButton, Menu, MenuItem, TextField } from "@mui/material";
+import { Button, Chip, IconButton, Menu, MenuItem, Select, TextField } from "@mui/material";
 import AddIcon from "@mui/icons-material/Add";
 import MoreVertIcon from "@mui/icons-material/MoreVert";
 import { BASE_URL } from "constants";
@@ -22,9 +22,7 @@ import LoanModal from "components/LoanModal";
 function LoanManagementPage() {
     const [filteredRows, setFilteredRows] = useState([]);
     const [loading, setLoading] = useState(true);
-    const [successSB, setSuccessSB] = useState(false);
     const [openModal, setOpenModal] = useState(false);
-    const [content, setContent] = useState("");
     const [anchorEl, setAnchorEl] = useState(null);
     const [selectedRow, setSelectedRow] = useState(null);
     const [drawerContent, setDrawerContent] = useState({});
@@ -32,11 +30,17 @@ function LoanManagementPage() {
     const [openDrawer, setOpenDrawer] = useState(false);
     const [search, setSearch] = useState("");
     const [refetch, setRefetch] = useState(new Date());
+    const [refetchLoans, setRefetchLoans] = useState(new Date());
 
     const { page, limit, total, changePage, changeLimit, changeTotal } = usePagination();
+    const [successSB, setSuccessSB] = useState({ open: false, status: "", title: "" });
+    const [content, setContent] = useState("");
 
-    const openSuccessSB = (title) => setSuccessSB(title);
-    const closeSuccessSB = () => setSuccessSB(false);
+    // Function to open snackbar with status and title
+    const openSuccessSB = (status, title) => setSuccessSB({ open: true, status, title });
+
+    // Function to close snackbar
+    const closeSuccessSB = () => setSuccessSB({ open: false, status: "", title: "" });
 
     const handleOpenModal = () => setOpenModal(true);
     const handleCloseModal = () => setOpenModal(false);
@@ -65,20 +69,25 @@ function LoanManagementPage() {
         try {
             const response = await axios.get(`${BASE_URL}/api/web/retrieve/loans`, {
                 params: { page, limit, search },
+                headers: {
+                    "Authorization": localStorage.getItem("token")
+                }
             });
             if (response.data.type === "success") {
-                openSuccessSB(response.data.message);
+                openSuccessSB("success", "loans retrieved successfully");
+                setContent("Dashboard data retrieved successfully");
                 setFilteredRows(response.data.data.data);
                 changeTotal(response.data.data.total);
             } else {
-                setContent("Failed to retrieve loans.");
-                openSuccessSB("Error");
+                openSuccessSB("success", "Loans retrieved successfully");
+                console.log(response.data.message)
+                // setContent(` ${result.data} `);
                 setFilteredRows([]);
             }
         } catch (err) {
             console.error(err);
-            setContent("An error occurred while fetching loans.");
-            openSuccessSB("Error");
+            openSuccessSB("error", err?.response?.data?.message);
+            // setContent(err?.response?.data?.data);
             setFilteredRows([]);
         }
         setLoading(false);
@@ -108,14 +117,43 @@ function LoanManagementPage() {
         },
     });
 
+    const handleStatusChange = async (row, newStatus) => {
+        setLoading(true);
+        console.log(newStatus)
+        try {
+            const response = await axios.put(`${BASE_URL}/api/web/status/loan`, {
+                id: row.id,
+                status: newStatus,
+            }, {
+                headers: {
+                    "Authorization": localStorage.getItem("token")
+                }
+            });
+            if (response.data.type === "success") {
+                openSuccessSB("success", "Status updated successfully");
+                setFilteredRows((prevRows) =>
+                    prevRows.map((item) =>
+                        item.id === row.id ? { ...item, status: newStatus } : item
+                    )
+                );
+            } else {
+                openSuccessSB("error", response.data.message);
+            }
+        } catch (err) {
+            console.error(err);
+            openSuccessSB("error", err?.response?.data?.message || "Failed to update status");
+        }
+        setLoading(false);
+    };
+
     const renderSuccessSB = (
         <MDSnackbar
-            color={successSB ? "success" : "warning"}
-            icon={successSB ? "check" : "warning"}
-            title={successSB ? successSB : ""}
-            content={content ? content : ""}
+            color={successSB.status === "success" ? "success" : successSB.status === "error" ? "warning" : "dark"}
+            icon={successSB.status === "success" ? "check" : successSB.status === "error" ? "warning" : ""}
+            title={successSB.title ? successSB.title : ""}
+            content={successSB.title ? successSB.title : ""}
             dateTime="1 min ago"
-            open={Boolean(successSB)}
+            open={successSB.open}
             onClose={closeSuccessSB}
             close={closeSuccessSB}
             bgWhite
@@ -123,19 +161,36 @@ function LoanManagementPage() {
     );
 
     const columns = [
-        { field: 'id', headerName: 'Loan ID', flex: 1 },
-        { field: 'amount', headerName: 'Principal Amount', flex: 1 },
-        { field: 'interestRate', headerName: 'Interest Rate', flex: 1 },
+        { field: 'id', headerName: 'Loan ID', width: 150 },
+        { field: 'amount', headerName: 'Principal Amount', width: 200 },
+        { field: 'interestRate', headerName: 'Interest Rate', width: 150 },
         // { field: 'EMIPlanId', headerName: 'EMI Plan', flex: 1 },
         {
-            field: 'status', headerName: 'Status', flex: 1, renderCell: (params) => (
-                <Chip label={params.row.status} size="small" variant="contained" color={params.row.status == "Active" ? "success": "warning"}/>
+            field: 'status',
+            headerName: 'Status',
+            flex: 1,
+            renderCell: (params) => (
+                <Select
+                    size="small"
+                    value={params.row.status}
+                    onChange={(event) => handleStatusChange(params.row, event.target.value)}
+                    fullWidth
+                >
+                    <MenuItem value="Active">Active</MenuItem>
+                    <MenuItem value="Settled">Settled</MenuItem>
+                    <MenuItem value="Overdue">Overdue</MenuItem>
+                    <MenuItem value="Inactive">Inactive</MenuItem>
+                </Select>
             ),
         },
         // { field: 'fieldOfficerId', headerName: 'Field Officer ID', flex: 1 },
         {
-            field: 'createdAt', headerName: 'Created On', flex: 1, valueFormatter: (value) => moment(value).format("YYYY MMM DD"),
+            field: 'guarantorId', headerName: 'Guarantor Id', width: 150,
         },
+        {
+            field: 'createdAt', headerName: 'Created On', width: 150, valueFormatter: (value) => moment(value).format("YYYY MMM DD"),
+        },
+
         {
             field: 'action',
             headerName: 'Actions',
@@ -154,7 +209,7 @@ function LoanManagementPage() {
 
     useEffect(() => {
         handleSearchClick();
-    }, [page, limit]);
+    }, [page, limit, refetchLoans]);
 
     return (
         <DashboardLayout>
@@ -177,24 +232,29 @@ function LoanManagementPage() {
                                 <MDTypography variant="h6" sx={{ alignContent: "center" }} color="white">
                                     Loans Table
                                 </MDTypography>
-                                <Button
+                                {/* <Button
                                     variant="contained"
                                     sx={{ background: "white !important", color: "black !important" }}
                                     onClick={handleOpenModal}
                                 >
                                     <AddIcon /> Add Loan
-                                </Button>
+                                </Button> */}
                             </MDBox>
                             <MDBox pt={3} px={3} pb={1}>
                                 <Grid container spacing={2} mb={2} alignItems="center">
                                     <Grid item xs={4} sm={4}>
                                         <TextField
-                                            label="Search by Mobile Number or PAN"
+                                            label={"Search by Mobile Number Or PAN Or Aadhar Or Name"}
                                             variant="outlined"
                                             size="small"
                                             fullWidth
                                             value={search}
-                                            onChange={handleSearchChange}
+                                            onChange={(e) => {
+                                                if (e.target.value === "") {
+                                                    setRefetchLoans(new Date())
+                                                }
+                                                handleSearchChange(e)
+                                            }}
                                         />
                                     </Grid>
                                     <Grid item xs={1} sm={1}>
@@ -221,7 +281,7 @@ function LoanManagementPage() {
                                             paginationMode="server"
                                             rowCount={total}
                                             pageSize={limit}
-                                            checkboxSelection
+                                            disableRowSelectionOnClick
                                             onPaginationModelChange={(value) => {
                                                 if (value.pageSize !== limit) {
                                                     changeLimit(value.pageSize);
@@ -255,6 +315,7 @@ function LoanManagementPage() {
                 onClose={() => setOpenDrawer(false)}
                 details={drawerContent}
                 type={drawerType}
+                openSuccessSB={openSuccessSB}
                 refetch={refetch}
             />
             <Footer />
@@ -267,7 +328,9 @@ function LoanManagementPage() {
                 <MenuItem onClick={() => handleMenuItemClick('Guarantor')}>View Guarantor Details</MenuItem>
                 <MenuItem onClick={() => handleMenuItemClick('FieldOfficer')}>View Field Officer Details</MenuItem>
                 <MenuItem onClick={() => handleMenuItemClick('EMI')}>View EMI Details</MenuItem>
-                <MenuItem onClick={() => handleMenuItemClick('SettledLoans')}>View Settled Loans</MenuItem>
+                <MenuItem onClick={() => handleMenuItemClick('Settle remaining Emis')}>Settle remaining Emi's</MenuItem>
+                <MenuItem onClick={() => handleMenuItemClick('Settle previous Emis')}>Settle previous Emi's</MenuItem>
+                <MenuItem onClick={() => handleMenuItemClick('Statement')}>Print Statement</MenuItem>
             </Menu>
         </DashboardLayout>
     );

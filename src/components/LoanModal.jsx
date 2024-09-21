@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Modal, Box, TextField, Button, Grid, MenuItem, Typography, IconButton, Tooltip } from '@mui/material';
+import { Modal, Box, TextField, Button, Grid, MenuItem, Typography, IconButton, Tooltip, CircularProgress } from '@mui/material';
 import { useFormik } from 'formik';
 import * as Yup from 'yup';
 import axios from 'axios';
@@ -21,6 +21,7 @@ const modalStyles = {
 
 const validationSchema = Yup.object({
     loanAmount: Yup.number().typeError('Loan Amount must be a number').required('Loan Amount is required'),
+    penalty: Yup.number().typeError('Penalty Amount must be a number').required('Penalty Amount is required'),
     interestRate: Yup.number().typeError('Interest Rate must be a number or float').required('Interest Rate is required'),
     fieldOfficerId: Yup.string().required('Field Officer is required'),
     emiStartDate: Yup.date().required('EMI Start Date is required'),
@@ -30,9 +31,11 @@ const validationSchema = Yup.object({
     guarantorId: Yup.string().required('Guarantor is required'),  // Add validation for Guarantor
 });
 
-function LoanModal({ open, handleClose, customerId }) {
+function LoanModal({ open, handleClose, openSuccessSB, customerId }) {
+    // console.log(openSuccessSB)
     const [fieldOfficers, setFieldOfficers] = useState([]);
     const [guarantors, setGuarantors] = useState([]);
+    const [loading, setLoading] = useState(false);
     const [selectedGuarantor, setSelectedGuarantor] = useState(null);
     const [showGuarantorModal, setShowGuarantorModal] = useState(false);
     const [emiAmount, setEmiAmount] = useState(null);
@@ -47,19 +50,31 @@ function LoanModal({ open, handleClose, customerId }) {
     useEffect(() => {
         const fetchFieldOfficers = async () => {
             try {
-                const response = await axios.get(`${BASE_URL}/api/web/retrieve/field-officers`);
+                const response = await axios.get(`${BASE_URL}/api/web/retrieve/field-officers`, {
+                    params: { status: "Active" },
+                    headers: {
+                        "Authorization": localStorage.getItem("token")
+                    },
+                });
                 setFieldOfficers(response.data.data.data);
-            } catch (error) {
-                console.error('Failed to fetch field officers:', error);
+                // openSuccessSB("success", response.data.message)
+
+            } catch (err) {
+                openSuccessSB("error", err.response.data.message)
+                console.error('Failed to fetch field officers:', err);
             }
         };
 
         const fetchGuarantors = async () => {
             try {
                 const response = await axios.get(`${BASE_URL}/api/web/retrieve/guarantors?customerId=${customerId}`, { headers: { "Authorization": localStorage.getItem("token") } });
+                // openSuccessSB("success", response.data.message)
+
                 setGuarantors(response.data.data || []);
-            } catch (error) {
-                console.error('Failed to fetch guarantors:', error);
+            } catch (err) {
+                openSuccessSB("error", err.response.data.message)
+
+                console.error('Failed to fetch guarantors:', err);
             }
         };
 
@@ -69,14 +84,15 @@ function LoanModal({ open, handleClose, customerId }) {
 
     const guarantorValidationSchema = Yup.object({
         name: Yup.string().required('Name is required'),
-        mobile: Yup.string().required('Mobile number is required'),
-        PAN: Yup.string().required('PAN is required'),
-        Aadhaar: Yup.string().required('Aadhaar is required'),
+        mobile: Yup.string().required('Mobile number is required').test("len", "Must be of 10 digit", value => value.length === 10),
+        PAN: Yup.string().required('PAN is required').test("len", "Must be of 10 Character", value => value?.length === 10),
+        Aadhaar: Yup.string().test("len", "Must be of 12 digit", value => value?.length === 12),
     });
 
     const handleGuarantorChange = (event) => {
         const guarantorId = event.target.value;
         const guarantor = guarantors.find(g => g.id === guarantorId);
+        console.log(guarantor)
         setSelectedGuarantor(guarantor);
         formik.setFieldValue('guarantorId', guarantorId);
     };
@@ -104,17 +120,21 @@ function LoanModal({ open, handleClose, customerId }) {
             const response = await axios.post(`${BASE_URL}/api/web/create/guarantor`, newGuarantor, {
                 headers: { "Authorization": localStorage.getItem("token") }
             });
+            openSuccessSB("success", response.data.message)
+
             console.log('Guarantor added successfully:', response.data);
 
             // Refresh guarantor list after adding
             const updatedGuarantors = await axios.get(`${BASE_URL}/api/web/retrieve/guarantors?customerId=${customerId}`, {
                 headers: { "Authorization": localStorage.getItem("token") }
             });
+
             setGuarantors(updatedGuarantors.data.data || []);
 
             setShowAddGuarantorModal(false);
-        } catch (error) {
-            console.error('Failed to add guarantor:', error);
+        } catch (err) {
+            openSuccessSB("error", err.response.data.message)
+            console.log('Failed to add guarantor:', err);
         }
     };
 
@@ -122,11 +142,12 @@ function LoanModal({ open, handleClose, customerId }) {
         initialValues: {
             customerId: customerId || '',
             loanAmount: '',
+            penalty: '',
             interestRate: '',
             fieldOfficerId: '',
             emiStartDate: '',
             numberOfEmis: '',
-            emiFrequency: 'Monthly',
+            emiFrequency: 'Daily',
             description: '',
             guarantorId: '',  // Add guarantor field
         },
@@ -143,6 +164,7 @@ function LoanModal({ open, handleClose, customerId }) {
                     emiFrequency: frequency,
                     description,
                     guarantorId,
+                    penalty
                 } = values;
 
                 const response = await axios.post(`${BASE_URL}/api/web/create/loan`, {
@@ -155,14 +177,23 @@ function LoanModal({ open, handleClose, customerId }) {
                     frequency,
                     description,
                     guarantorId,
+                    penalty
+                }, {
+                    "Content-Type": "multipart/form-data",
+                    headers: {
+                        "Authorization": localStorage.getItem("token")
+                    }
                 });
+                openSuccessSB("success", response.data.message)
 
                 console.log('Loan created successfully:', response.data);
 
                 handleClose();
                 resetForm();
-            } catch (error) {
-                console.error('Failed to create loan:', error);
+            } catch (err) {
+                openSuccessSB("error", err.response.data.message)
+
+                console.error('Failed to create loan:', err);
             } finally {
                 setSubmitting(false);
             }
@@ -180,7 +211,9 @@ function LoanModal({ open, handleClose, customerId }) {
         validationSchema: guarantorValidationSchema,
         onSubmit: async (values, { setSubmitting, resetForm }) => {
             try {
-                const response = await axios.post(`${BASE_URL}/api/web/create/guarantor`, values, {
+                console.log(guarantorFormik.values.PAN.toUpperCase().slice(0, guarantorFormik.values.PAN.length - 1) + guarantorFormik.values.PAN.slice(guarantorFormik.values.PAN.length - 1, guarantorFormik.values.PAN.length).toUpperCase())
+                setLoading(true)
+                const response = await axios.post(`${BASE_URL}/api/web/create/guarantor`, { ...values, PAN: guarantorFormik.values.PAN.toUpperCase().slice(0, guarantorFormik.values.PAN.length - 1) + guarantorFormik.values.PAN.slice(guarantorFormik.values.PAN.length - 1, guarantorFormik.values.PAN.length).toUpperCase() }, {
                     headers: { "Authorization": localStorage.getItem("token") }
                 });
                 console.log('Guarantor added successfully:', response.data);
@@ -189,13 +222,18 @@ function LoanModal({ open, handleClose, customerId }) {
                 const updatedGuarantors = await axios.get(`${BASE_URL}/api/web/retrieve/guarantors?customerId=${customerId}`, {
                     headers: { "Authorization": localStorage.getItem("token") }
                 });
+                openSuccessSB("success", response.data.message)
+
                 setGuarantors(updatedGuarantors.data.data || []);
 
                 setShowAddGuarantorModal(false);
                 resetForm();
-            } catch (error) {
-                console.error('Failed to add guarantor:', error);
+            } catch (err) {
+                openSuccessSB("error", err.response.data.message)
+
+                console.error('Failed to add guarantor:', err);
             } finally {
+                setLoading(false)
                 setSubmitting(false);
             }
         },
@@ -206,7 +244,7 @@ function LoanModal({ open, handleClose, customerId }) {
     useEffect(() => {
         if (formik.values.loanAmount && formik.values.interestRate && formik.values.numberOfEmis) {
             const emi = calculateEMI(formik.values.loanAmount, formik.values.interestRate, formik.values.numberOfEmis, formik.values.emiFrequency);
-            setEmiAmount(emi);
+            setEmiAmount(Math.round(emi));
         }
     }, [formik.values.loanAmount, formik.values.interestRate, formik.values.numberOfEmis]);
 
@@ -239,6 +277,18 @@ function LoanModal({ open, handleClose, customerId }) {
                                 onChange={formik.handleChange}
                                 error={formik.touched.loanAmount && Boolean(formik.errors.loanAmount)}
                                 helperText={formik.touched.loanAmount && formik.errors.loanAmount}
+                                fullWidth
+                            />
+                        </Grid>
+                        <Grid item xs={6}>
+                            <TextField
+                                name="penalty"
+                                label="Loan Penalty"
+                                type="number"
+                                value={formik.values.penalty}
+                                onChange={formik.handleChange}
+                                error={formik.touched.penalty && Boolean(formik.errors.penalty)}
+                                helperText={formik.touched.penalty && formik.errors.penalty}
                                 fullWidth
                             />
                         </Grid>
@@ -312,6 +362,9 @@ function LoanModal({ open, handleClose, customerId }) {
                                     )
                                 }}
                             >
+                                <MenuItem value={"SELF"}>
+                                    Self
+                                </MenuItem>
                                 {guarantors.length > 0 ? (
                                     guarantors.map((guarantor) => (
                                         <MenuItem key={guarantor.id} value={guarantor.id}>
@@ -409,9 +462,13 @@ function LoanModal({ open, handleClose, customerId }) {
                         <Button onClick={handleClose} variant="outlined" sx={{ mr: 2, color: "black !important" }}>
                             Cancel
                         </Button>
-                        <Button type="submit" variant="contained" sx={{ background: "red", color: "white !important" }}>
-                            Create Loan
+                        <Button type="submit" variant="contained" sx={{ background: "red", color: "white !important" }} disabled={formik.isSubmitting} color="primary">
+                            {formik.isSubmitting ? <CircularProgress size={24} color="inherit" /> : "Create Loan"}
                         </Button>
+
+                        {/* <Button type="submit" variant="contained" >
+                            Create Loan
+                        </Button> */}
                     </Box>
                 </form>
 
@@ -469,7 +526,7 @@ function LoanModal({ open, handleClose, customerId }) {
                                     <TextField
                                         name="name"
                                         label="Name"
-                                        value={guarantorFormik.values.name}
+                                        value={guarantorFormik.values.name.charAt(0).toUpperCase() + guarantorFormik.values.name.slice(1, guarantorFormik.values.name.length)}
                                         onChange={guarantorFormik.handleChange}
                                         error={guarantorFormik.touched.name && Boolean(guarantorFormik.errors.name)}
                                         helperText={guarantorFormik.touched.name && guarantorFormik.errors.name}
@@ -479,7 +536,13 @@ function LoanModal({ open, handleClose, customerId }) {
                                 <Grid item xs={6}>
                                     <TextField
                                         name="mobile"
+                                        // type="number"
                                         label="Mobile"
+                                        // inputProps={{
+                                        //     min:10 ,
+                                        //     max:10,
+                                        //     length:10
+                                        // }}
                                         value={guarantorFormik.values.mobile}
                                         onChange={guarantorFormik.handleChange}
                                         error={guarantorFormik.touched.mobile && Boolean(guarantorFormik.errors.mobile)}
@@ -491,7 +554,7 @@ function LoanModal({ open, handleClose, customerId }) {
                                     <TextField
                                         name="PAN"
                                         label="PAN"
-                                        value={guarantorFormik.values.PAN}
+                                        value={guarantorFormik.values.PAN.toUpperCase().slice(0, guarantorFormik.values.PAN.length - 1) + guarantorFormik.values.PAN.slice(guarantorFormik.values.PAN.length - 1, guarantorFormik.values.PAN.length).toUpperCase()}
                                         onChange={guarantorFormik.handleChange}
                                         error={guarantorFormik.touched.PAN && Boolean(guarantorFormik.errors.PAN)}
                                         helperText={guarantorFormik.touched.PAN && guarantorFormik.errors.PAN}
@@ -514,9 +577,12 @@ function LoanModal({ open, handleClose, customerId }) {
                                 <Button onClick={() => setShowAddGuarantorModal(false)} variant="outlined" sx={{ mr: 2, color: "black !important" }}>
                                     Cancel
                                 </Button>
-                                <Button type="submit" variant="contained" sx={{ background: "red !important", color: "white !important" }}>
-                                    Add Guarantor
+                                <Button disabled={loading} type="submit" variant="contained" sx={{ background: "red !important", color: "white !important" }}>
+                                    {guarantorFormik.isSubmitting ? <CircularProgress size={24} color="inherit" /> : 'Add Guarantor'}
                                 </Button>
+                                {/* <Button type="submit" variant="contained" sx={{ background: "red !important", color: "white !important" }}>
+                                    Add Guarantor
+                                </Button> */}
                             </Box>
                         </form>
                     </Box>
@@ -529,9 +595,11 @@ function LoanModal({ open, handleClose, customerId }) {
 }
 
 function calculateEMI(loanAmount, interestRate, numberOfEmis, emiFrequency) {
-    const rate = interestRate / 100 / 12; // Assuming interest rate is per annum and EMI frequency is monthly
-    const n = numberOfEmis;
-    const emi = (loanAmount * rate * Math.pow(1 + rate, n)) / (Math.pow(1 + rate, n) - 1);
+    // const rate = interestRate / 100 / 12; // Assuming interest rate is per annum and EMI frequency is monthly
+    const rate = interestRate / 100;
+    // const n = numberOfEmis;
+    // const emi = (loanAmount * rate * Math.pow(1 + rate, n)) / (Math.pow(1 + rate, n) - 1);
+    const emi = (loanAmount + loanAmount * rate) / numberOfEmis
     return emi.toFixed(2); // Return the EMI amount rounded to 2 decimal places
 }
 

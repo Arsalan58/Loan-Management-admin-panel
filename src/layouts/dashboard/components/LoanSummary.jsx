@@ -8,11 +8,11 @@ const LoanSummary = ({ summary }) => {
     <MDBox>
       <Typography variant="h6">Loan Summary</Typography>
       <Card>
-        <CardContent>
-          <Typography variant="body1">Total Loans: {summary.totalLoans}</Typography>
-          <Typography variant="body1">Total Principal Amount: ₹{summary.totalPrincipalAmount}</Typography>
-          <Typography variant="body1">Total Interest Amount: ₹{summary.totalInterestAmount}</Typography>
-          <Typography variant="body1">Total Revenue: ₹{summary.totalRevenue}</Typography>
+        <CardContent >
+          <Typography variant="body1" sx={{ fontSize: 17, color: "#7b809a" }}>Total Loans: {summary.totalLoans}</Typography>
+          <Typography variant="body1" sx={{ fontSize: 17, color: "#7b809a" }}>Total Principal Amount: ₹{summary.totalPrincipalAmount || 0}</Typography>
+          <Typography variant="body1" sx={{ fontSize: 17, color: "#7b809a" }}>Total Interest Amount: ₹{summary.totalInterestAmount}</Typography>
+          <Typography variant="body1" sx={{ fontSize: 17, color: "#7b809a" }}>Total Revenue: ₹{summary.totalRevenue}</Typography>
         </CardContent>
       </Card>
     </MDBox>

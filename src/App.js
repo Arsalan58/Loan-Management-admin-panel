@@ -1,32 +1,23 @@
 import { useState, useEffect } from "react";
 
-// react-router components
 import { Routes, Route, Navigate, useLocation } from "react-router-dom";
 
-// @mui material components
 import { ThemeProvider } from "@mui/material/styles";
 import CssBaseline from "@mui/material/CssBaseline";
 import Icon from "@mui/material/Icon";
-// Material Dashboard 2 React components
 import MDBox from "components/MDBox";
 
-// Material Dashboard 2 React example components
 import Sidenav from "examples/Sidenav";
 import Configurator from "examples/Configurator";
 
-// Material Dashboard 2 React themes
 import theme from "assets/theme";
 
-// Material Dashboard 2 React Dark Mode themes
 import themeDark from "assets/theme-dark";
 
-// Material Dashboard 2 React routes
 import routes from "routes";
 
-// Material Dashboard 2 React contexts
 import { useMaterialUIController, setMiniSidenav, setOpenConfigurator } from "context";
 
-// Images
 import brandWhite from "assets/images/logo-ct.png";
 import brandDark from "assets/images/logo-ct-dark.png";
 import { ProtectedRoute } from "./helpers/ProtectedRoute";
@@ -49,7 +40,6 @@ export default function App() {
   const [onMouseEnter, setOnMouseEnter] = useState(false);
   const { pathname } = useLocation();
 
-  // Open sidenav when mouse enter on mini sidenav
   const handleOnMouseEnter = () => {
     if (miniSidenav && !onMouseEnter) {
       setMiniSidenav(dispatch, false);
@@ -57,7 +47,6 @@ export default function App() {
     }
   };
 
-  // Close sidenav when mouse leave mini sidenav
   const handleOnMouseLeave = () => {
     if (onMouseEnter) {
       setMiniSidenav(dispatch, true);
@@ -65,10 +54,8 @@ export default function App() {
     }
   };
 
-  // Change the openConfigurator state
   const handleConfiguratorOpen = () => setOpenConfigurator(dispatch, !openConfigurator);
 
-  // Setting page scroll to 0 when changing the route
   useEffect(() => {
     document.documentElement.scrollTop = 0;
     document.scrollingElement.scrollTop = 0;
@@ -125,7 +112,7 @@ export default function App() {
             onMouseLeave={handleOnMouseLeave}
           />
           <Configurator />
-          {configsButton}
+          {/* {configsButton} */}
         </>
       )}
       {layout === "vr" && <Configurator />}

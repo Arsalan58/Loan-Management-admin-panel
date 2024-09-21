@@ -37,7 +37,7 @@ const FieldOfficerModal = ({
         },
         validationSchema: Yup.object({
             name: Yup.string().required("Required"),
-            mobile: Yup.string().required("Required"),
+            mobile: Yup.string().required("Required").test("len","Mobile should be of 10 digits", value => value.length === 10),
             assignedArea: Yup.string().required("Required"),
             password: Yup.string().required("Required"),
             status: Yup.string().required("Required"),
@@ -62,17 +62,17 @@ const FieldOfficerModal = ({
                     },
                 });
                 if (response.data.type === "success") {
-                    openSuccessSB("Field Officer created successfully.");
-                    setFilteredRows((prevRows) => [...prevRows, response.data.data]);
+                    openSuccessSB("success","Field Officer created successfully.");
+                    setFilteredRows((prevRows) => [response.data.data,...prevRows, ]);
                     changeTotal((prevTotal) => prevTotal + 1);
                     resetForm();
                     handleClose();
                 } else {
-                    openSuccessSB("Error", "Failed to create field officer.");
+                    openSuccessSB("error", "Failed to create field officer.");
                 }
             } catch (err) {
                 console.error(err);
-                openSuccessSB("Error", "An error occurred while creating the field officer.");
+                openSuccessSB("error", err.response.data.message);
             }
         },
     });
@@ -98,7 +98,7 @@ const FieldOfficerModal = ({
                                 label="Name"
                                 type="text"
                                 fullWidth
-                                value={values.name}
+                                value={values.name.charAt(0).toUpperCase() + values.name.slice(1, values.name.length)}
                                 onChange={handleChange}
                                 error={touched.name && Boolean(errors.name)}
                                 helperText={touched.name && errors.name}
@@ -109,7 +109,7 @@ const FieldOfficerModal = ({
                                 margin="dense"
                                 name="mobile"
                                 label="Mobile"
-                                type="text"
+                                type="number"
                                 fullWidth
                                 value={values.mobile}
                                 onChange={handleChange}
